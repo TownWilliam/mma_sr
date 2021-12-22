@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 # @registry.register_model("mma_sr")
-class MMA_SR(BaseModel):
+class MMA_SR_Model(BaseModel):
     def __init__(self, config):
         super().__init__(config)
         self.mmt_config = BertConfig(**self.config.mmt)
