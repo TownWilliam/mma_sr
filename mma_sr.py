@@ -11,13 +11,11 @@ from mmf.modules.layers import ClassifierLayer
 from mmf.utils.build import build_image_encoder
 from omegaconf import OmegaConf
 from torch import nn
-from mmf.models.gcn import PyGCN
 from transformers.modeling_bert import (
     BertConfig,
     BertLayerNorm
 )
 import json
-from sklearn.cluster import DBSCAN
 
 logger = logging.getLogger(__name__)
 
