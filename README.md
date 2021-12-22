@@ -4,7 +4,7 @@ This is a crude and non-official implemention of the mma_sr model in the paper :
 ![image](https://user-images.githubusercontent.com/49356039/147088105-209facee-7c1e-40f3-a6a1-bc78ab8482f6.png)
 
 
-The code is based on the mmf-framework, which is a popular framework created by Facebook AI Research. The other interface and packages is here: https://github.com/facebookresearch/mmf
+The code is based on the mmf-framework, which is a popular framework from Facebook AI Research. The other interfaces and packages are here: https://github.com/facebookresearch/mmf
 
 All the research work belongs to those researchers, I just write it with pytorch by my own for the follow-up study. I find the author of the paper has published a new paper in https://openaccess.thecvf.com/content/CVPR2021/papers/Wang_Improving_OCR-Based_Image_Captioning_by_Incorporating_Geometrical_Relationship_CVPR_2021_paper.pdf (CVPR 2021). The structure of the model is similar with the mma_sr and has more powerful performance in OCR-based image captioning task.However, its code is still not open souce. 
 
@@ -15,3 +15,5 @@ If you want to use this program, you just need to install the previous mmf and t
 My programming ability is not well so I just write the code as this paper says. However, even if I tried many times, I still could not get the best 24.0 BLEU-4 and other metrics result in the paper. I could only get the result that BLEU-4 22.5. 
 
 Perhaps there is something goes wrong with my code. I could not find out whcih part in my code is false. If you could find out the problem in the code, I would appreciate it very much. 
+
+I would also modify the code in the later.
