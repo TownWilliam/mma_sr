@@ -140,7 +140,7 @@ class MMA_SR_Model(BaseModel):
         obj_feat = obj_fc7
         obj_bbox = sample_list.obj_bbox_coordinates
 
-        obj_in = self.obj_feat_layer_norm(self.linear_obj_feat_to_mmt_in(obj_feat))  +self.obj_bbox_layer_norm(self.linear_obj_bbox_to_mmt_in(obj_bbox))
+        obj_in = self.obj_feat_layer_norm(self.linear_obj_feat_to_mmt_in(obj_feat))
         obj_in = self.obj_drop(obj_in)
         fwd_results["obj_in"] = obj_in
 
@@ -184,8 +184,7 @@ class MMA_SR_Model(BaseModel):
         if self.remove_ocr_bbox:
             ocr_bbox = torch.zeros_like(ocr_bbox)
         ocr_in = self.ocr_feat_layer_norm(self.linear_ocr_feat_to_mmt_in(ocr_feat)) + self.ocr_bbox_layer_norm(self.linear_ocr_bbox_to_mmt_in(ocr_bbox))
-        #ocr_in = self.linear_ocr_feat_to_mmt_in(ocr_feat) + self.linear_ocr_bbox_to_mmt_in(ocr_bbox)
-
+        
         ocr_in = self.ocr_drop(ocr_in)
         fwd_results["ocr_in"] = ocr_in
 
@@ -395,7 +394,7 @@ class AttentionC(nn.Module):
             alpha = self.softmax(att + extended_attention_mask)  # (batch_size, 36)
         else:
             alpha = self.softmax(att)
-        context = (attended_features * alpha.unsqueeze(2)).sum(dim=1)  # (batch_size, 2048)
+        context = (attended_features * alpha.unsqueeze(2)).sum(dim=1)  
         return context
 
 
@@ -423,9 +422,10 @@ class MMA_SR(nn.Module):
         self.fusion_lstm = nn.LSTMCell(decoder_dim + emb_dim + obj_dim, decoder_dim)
         self.obj_lstm = nn.LSTMCell(obj_dim + decoder_dim, decoder_dim)
         self.ocr_lstm = nn.LSTMCell(ocr_dim + decoder_dim, decoder_dim)
+        
         self.ocr_prt = OcrPtrNet(hidden_size=attention_dim)
-
         self.fc = nn.Linear(decoder_dim, self.vocab_size)
+        
         self.fc2 = nn.Linear(self.vocab_size+50, self.vocab_size+50)
 
     def init_hidden_state(self, batch_size, device):
@@ -446,7 +446,8 @@ class MMA_SR(nn.Module):
             sort_ind = torch.tensor([i for i in range(batch_size)]).to(device)
             target_caption = torch.zeros([batch_size, 30], dtype=torch.long).to(device)
             target_caption[:, 0] = 1
-            caption_lengths = torch.tensor([30 for _ in range(batch_size)])
+            caption_lengths = torch.tensor([30 for _ in range(batch_size)])   
+            # I also tried to set the max length as 20 but still could not get better result on metrics.
 
         embeddings = self.embed(self.voc_emb.weight, ocr_features, target_caption)  # [sort_ind]
 
@@ -479,19 +480,18 @@ class MMA_SR(nn.Module):
             h_obj, c_obj = self.obj_lstm(torch.cat([h_fu, v_obj_weighted], dim=-1), (h_obj, c_obj))
             h_ocr, c_ocr = self.ocr_lstm(torch.cat([h_fu, v_ocr_weighted], dim=-1), (h_ocr, c_ocr))
 
-            s_v = self.fc(self.dropout(h_obj))
-            s_o = self.ocr_prt(self.dropout(h_ocr), ocr_features, ocr_mask)
-            scores = self.fc2( torch.cat([s_v, s_o], dim=-1) )
+            s_v = self.fc(h_obj)
+            s_o = self.ocr_prt(h_ocr, ocr_features, ocr_mask)
+            scores = self.fc2( self.dropout(torch.cat([s_v, s_o], dim=-1) ) )
 
 
 
             if not training and t < dec_num-1 :
                 
-                scores[:,3] = -1e6
-                scores = scores
+                scores[:,3] = -1e6 # avoid output the word <unk>
                 pre_idx = (scores.argmax(dim=-1)).long()
                 target_caption[:, t + 1] = pre_idx
-                embeddings = self.embed(self.voc_emb.weight, ocr_features, target_caption)
+                embeddings = self.embed(self.voc_emb.weight, ocr_features, target_caption)  # create the word embedding for the next step
     
             predictions[:, t ] = scores
 
