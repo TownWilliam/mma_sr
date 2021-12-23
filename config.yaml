@@ -1,0 +1,204 @@
+config_version: 1.0
+training:
+  trainer: mmf
+  seed: 6538703
+  experiment_name: run
+  max_updates: 92000
+  max_epochs: null
+  log_interval: 100
+  logger_level: info
+  log_format: simple
+  log_detailed_config: false
+  should_not_log: false
+  colored_logs: true
+  tensorboard: false
+  batch_size: 32
+  update_frequency: 1
+  num_workers: 0
+  fast_read: false
+  dataset_size_proportional_sampling: true
+  pin_memory: false
+  checkpoint_interval: 1000
+  evaluation_interval: 1000
+  clip_gradients: true
+  clip_norm_mode: all
+  early_stop:
+    enabled: false
+    patience: 4000
+    criteria: textcaps/textcaps_bleu4
+    minimize: false
+  lr_scheduler: true
+  lr_steps:
+  - 15000
+  - 21000
+  lr_ratio: 0.1
+  use_warmup: true
+  warmup_factor: 0.2
+  warmup_iterations: 2000
+  device: cuda
+  local_rank: null
+  verbose_dump: false
+  find_unused_parameters: false
+  evaluate_metrics: false
+  detect_anomaly: false
+  fp16: false
+  max_grad_l2_norm: 0.25
+  max_iterations: 66000
+  task_size_proportional_sampling: true
+evaluation:
+  metrics:
+  - textcaps_bleu4
+  predict: false
+  predict_file_format: json
+model_config:
+  m4c_captioner:
+    lr_scale_frcn: 0.1
+    lr_scale_text_bert: 0.1
+    lr_scale_mmt: 1.0
+    text_bert_init_from_bert_base: true
+    text_bert:
+      num_hidden_layers: 3
+    obj:
+      mmt_in_dim: 2048
+      dropout_prob: 0.1
+    ocr:
+      mmt_in_dim: 3002
+      dropout_prob: 0.1
+    mmt:
+      hidden_size: 768
+      num_hidden_layers: 4
+    mmt_branch:
+      hidden_size: 768
+      num_hidden_layers: 3
+    classifier:
+      type: linear
+      ocr_max_num: 50
+      ocr_ptr_net:
+        hidden_size: 768
+        query_key_size: 768
+      params: {}
+    model_data_dir: /tangwenliang/mmf
+    losses:
+    - type: m4c_decoding_bce_with_mask
+    remove_unk_in_pred: true
+    model: m4c_captioner
+dataset_config:
+  textcaps:
+    data_dir: /tangwenliang/mmf/datasets
+    depth_first: false
+    fast_read: false
+    zoo_requirements:
+    - textvqa.defaults
+    - textvqa.ocr_en
+    - textcaps.defaults
+    max_features: 100
+    use_images: false
+    use_features: true
+    use_order_vectors: true
+    annotation_style: textcaps
+    features:
+      train:
+      - textvqa/defaults/features/open_images/detectron.lmdb,textvqa/ocr_en/features/ocr_en_frcn_features.lmdb
+      val:
+      - textvqa/defaults/features/open_images/detectron.lmdb,textvqa/ocr_en/features/ocr_en_frcn_features.lmdb
+      test:
+      - textvqa/defaults/features/open_images/detectron.lmdb,textvqa/ocr_en/features/ocr_en_frcn_features.lmdb
+    annotations:
+      train:
+      - textcaps/defaults/annotations/imdb_train.npy
+      val:
+      - textcaps/defaults/annotations/imdb_val_filtered_by_image_id.npy
+      test:
+      - textcaps/defaults/annotations/imdb_test_filtered_by_image_id.npy
+    processors:
+      text_processor:
+        type: bert_tokenizer
+        params:
+          tokenizer_config:
+            type: bert-base-uncased
+            params:
+              do_lower_case: true
+          max_seq_length: 3
+      answer_processor:
+        type: m4c_caption
+        params:
+          vocab_file: textcaps/defaults/extras/vocabs/vocab_textcaps_threshold_10.txt
+          preprocessor:
+            type: simple_word
+            params: {}
+          context_preprocessor:
+            type: simple_word
+            params: {}
+          max_length: 50
+          max_copy_steps: 30
+          num_answers: 1
+      copy_processor:
+        type: copy
+        params:
+          max_length: 100
+      phoc_processor:
+        type: phoc
+        params:
+          max_length: 50
+      context_processor:
+        type: fasttext
+        params:
+          max_length: 50
+          model_file: wiki.en.bin
+      ocr_token_processor:
+        type: simple_word
+        params: {}
+      bbox_processor:
+        type: bbox
+        params:
+          max_length: 50
+    return_features_info: true
+    use_ocr: true
+    use_ocr_info: true
+datasets: textcaps
+model: m4c_captioner
+config: projects/m4c_captioner/configs/m4c_captioner/textcaps/defaults.yaml
+run_type: train_val
+optimizer:
+  allow_unused_parameters: false
+  enable_state_sharding: false
+  params:
+    eps: 1.0e-08
+    lr: 0.0002
+    weight_decay: 0
+  type: Adam
+scheduler: {}
+env:
+  cache_dir: /tangwenliang/mmf/cache
+  dataset_zoo: configs/zoo/datasets.yaml
+  model_zoo: configs/zoo/models.yaml
+  data_dir: /tangwenliang/mmf
+  save_dir: /tangwenliang/mmf/mma_sr_gcn_noobjbox
+  log_dir: ''
+  report_dir: ''
+  tensorboard_logdir: ''
+  user_dir: /tangwenliang
+distributed:
+  init_method: null
+  rank: 0
+  port: -1
+  backend: nccl
+  world_size: 1
+  no_spawn: false
+checkpoint:
+  resume: true
+  resume_file: null
+  resume_best: false
+  resume_pretrained: false
+  resume_zoo: null
+  zoo_config_override: false
+  pretrained_state_mapping: {}
+  max_to_keep: -1
+  save_git_details: true
+  reset:
+    all: false
+    optimizer: false
+    counts: false
+    fp16_scaler: false
+start_rank: 0
+device_id: 0
