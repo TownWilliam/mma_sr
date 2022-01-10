@@ -366,7 +366,8 @@ def _batch_gather(x, inds):
     x_flat = x.view(batch_size * length, dim)
 
     batch_offsets = torch.arange(batch_size, device=inds.device) * length
-    batch_offsets = batch_offsets.unsqueeze(-1)
+    if inds.dim() == 2:
+        batch_offsets = batch_offsets.unsqueeze(-1)
     assert batch_offsets.dim() == inds.dim()
     inds_flat = batch_offsets + inds
     results = F.embedding(inds_flat, x_flat)
