@@ -406,15 +406,18 @@ class MMA_SR(nn.Module):
                  ocr_dim=1000,
                  emb_dim=1000,
                  attention_dim=1000,
-                 mmt_config=None):
+                 mmt_config=None,
+                 ss_prob=0.0):
 
         super(MMA_SR, self).__init__()
-        self.dropout = nn.Dropout(0.2)
+        self.dropout = nn.Dropout(0.3)
         self.decoder_dim = decoder_dim
         self.embed_config = mmt_config
         self.vocab_size = 6736
+        self.ocr_size = 50
         self.voc_emb = nn.Embedding(self.vocab_size, emb_dim)
         self.embed = PrevPredEmbeddings(self.embed_config)
+        self.ss_prob = 0.0
 
         self.obj_attention = AttentionC(obj_dim, decoder_dim, attention_dim)
         self.ocr_attention = AttentionC(ocr_dim, decoder_dim, attention_dim)
@@ -422,11 +425,10 @@ class MMA_SR(nn.Module):
         self.fusion_lstm = nn.LSTMCell(decoder_dim + emb_dim + obj_dim, decoder_dim)
         self.obj_lstm = nn.LSTMCell(obj_dim + decoder_dim, decoder_dim)
         self.ocr_lstm = nn.LSTMCell(ocr_dim + decoder_dim, decoder_dim)
-        
         self.ocr_prt = OcrPtrNet(hidden_size=attention_dim)
+
         self.fc = nn.Linear(decoder_dim, self.vocab_size)
-        
-        self.fc2 = nn.Linear(self.vocab_size+50, self.vocab_size+50)
+        # self.fc2 = nn.Linear(self.vocab_size+50, self.vocab_size+50)
 
     def init_hidden_state(self, batch_size, device):
         h = torch.zeros(batch_size, self.decoder_dim).to(device)  # (batch_size, decoder_dim)
@@ -435,40 +437,51 @@ class MMA_SR(nn.Module):
 
     def forward(self, obj_features, ocr_features, ocr_mask, target_caption=None, target_cap_len=None, training=True,
                 label=None):
-
+        max_len = 30
         batch_size = obj_features.size(0)
         device = obj_features.device
+        repeat_mask = torch.zeros([batch_size, self.vocab_size + self.ocr_size]).to(device)
 
         if training:
             caption_lengths, sort_ind = target_cap_len.squeeze(1).sort(dim=0, descending=True)
-            
         else:
-            sort_ind = torch.tensor([i for i in range(batch_size)]).to(device)
-            target_caption = torch.zeros([batch_size, 30], dtype=torch.long).to(device)
+            target_caption = torch.zeros([batch_size, max_len], dtype=torch.long).to(device)
             target_caption[:, 0] = 1
-            caption_lengths = torch.tensor([30 for _ in range(batch_size)])   
-            # I also tried to set the max length as 20 but still could not get better result on metrics.
-
-        embeddings = self.embed(self.voc_emb.weight, ocr_features, target_caption)  # [sort_ind]
+            caption_lengths = torch.tensor([max_len for _ in range(batch_size)])
 
 
         h_obj, c_obj = self.init_hidden_state(batch_size, device)  # (batch_size, decoder_dim)
         h_ocr, c_ocr = self.init_hidden_state(batch_size, device)
         h_fu, c_fu = self.init_hidden_state(batch_size, device)
-       
         decode_lengths = caption_lengths.tolist()
 
-        predictions = torch.zeros(batch_size, 30, self.vocab_size + 50).to(device)
+        predictions = torch.zeros(batch_size, max_len, self.vocab_size + self.ocr_size).to(device)
 
         ocr_num = ocr_mask.sum(dim=-1)
         ocr_nums = (ocr_num + (ocr_num == 0).long())
         ocr_mean = ocr_features.sum(dim=1) / ocr_nums.unsqueeze(1)
         obj_mean = obj_features.mean(1)
         dec_num = int(max(decode_lengths))
-  
+        if dec_num > max_len:
+            dec_num = max_len
         for t in range(dec_num):
 
-            y = embeddings[:, t]
+            if training and t >= 1 and self.ss_prob > 0.0:
+                sample_prob = obj_mean.new(batch_size).uniform_(0, 1)
+                sample_mask = sample_prob < self.ss_prob
+                if sample_mask.sum() == 0:
+                    it = target_caption[:, t].clone()
+                else:
+                    sample_ind = sample_mask.nonzero().view(-1)
+                    it = target_caption[:, t].data.clone()
+                    prob_prev = torch.exp(predictions[:, t - 1].detach())  # fetch prev distribution: shape Nx(M+1)
+                    it.index_copy_(0, sample_ind, torch.multinomial(prob_prev, 1).view(-1).index_select(0, sample_ind))
+            else:
+                it = target_caption[:, t].clone()
+
+            y = self.embed(self.voc_emb.weight, ocr_features, it)
+
+
 
             x_fu = torch.cat([h_obj + h_ocr, obj_mean + ocr_mean, y], dim=-1)
             h_fu, c_fu = self.fusion_lstm(x_fu, (h_fu, c_fu))
@@ -480,23 +493,26 @@ class MMA_SR(nn.Module):
             h_obj, c_obj = self.obj_lstm(torch.cat([h_fu, v_obj_weighted], dim=-1), (h_obj, c_obj))
             h_ocr, c_ocr = self.ocr_lstm(torch.cat([h_fu, v_ocr_weighted], dim=-1), (h_ocr, c_ocr))
 
-            s_v = self.fc(h_obj)
-            s_o = self.ocr_prt(h_ocr, ocr_features, ocr_mask)
-            scores = self.fc2( self.dropout(torch.cat([s_v, s_o], dim=-1) ) )
+            s_v = self.fc( self.dropout(h_obj) )
+            s_o = self.ocr_prt(self.dropout(h_ocr), ocr_features, ocr_mask)
 
+            scores = torch.cat([s_v, s_o], dim=-1)
 
-
-            if not training and t < dec_num-1 :
-                
-                scores[:,3] = -1e6 # avoid output the word <unk>
+            if not training and t < dec_num - 1:
+              
+                scores[:, 3] = -1e10
+                scores = scores + repeat_mask
                 pre_idx = (scores.argmax(dim=-1)).long()
                 target_caption[:, t + 1] = pre_idx
-                embeddings = self.embed(self.voc_emb.weight, ocr_features, target_caption)  # create the word embedding for the next step
-    
-            predictions[:, t ] = scores
+                for j in range(batch_size):
+                    used_idx = pre_idx[j]
+                    if used_idx >= self.vocab_size:
+                        repeat_mask[j, used_idx] = -1e6
+
+            predictions[:, t] = scores
+
 
         return predictions
-
    
 
 
