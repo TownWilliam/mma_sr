@@ -18,7 +18,7 @@ My programming ability is not well so I just write the code as this paper says. 
 | Model             | BLEU-4        |Metor          | Rouge-L       |Spice          |CIDEr          |
 |----------         |:-------------:|:-------------:|:-------------:|:-------------:|:-------------:|
 | baseline in paper |  24.0         |22.6           |47.0           |15.6           |93.7           |
-| my code           |    22.28      |  21.52        |44.99          |14.53          |86.89          |
+| my code           |    22.3       |  21.5         |45.0           |14.5           |86.9           |
 
 
 Perhaps there is something goes wrong with my code. I could not find out whcih part in my code is false. If you could find out the problem in the code, I would appreciate it very much. 
