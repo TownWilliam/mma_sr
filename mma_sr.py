@@ -1,4 +1,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
+# Put this file in the location:  mmf/models
 import functools
 import logging
 import math
