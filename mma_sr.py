@@ -19,7 +19,7 @@ import json
 
 logger = logging.getLogger(__name__)
 
-
+@registry.register_model("m4c")
 # @registry.register_model("mma_sr")
 class MMA_SR_Model(BaseModel):
     def __init__(self, config):
