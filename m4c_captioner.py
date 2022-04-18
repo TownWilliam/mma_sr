@@ -1,4 +1,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
+# Put this file in the location mmf/models/
 from mmf.common.registry import registry
 from mmf.models.mma_sr import M4C
 
