@@ -23,6 +23,6 @@ My programming ability is not well so I just write the code as this paper says. 
 
 
 
-Perhaps there is something goes wrong with my code. I could not find out whcih part in my code is false. If you could find out the problem in the code, I would appreciate it very much. 
+Perhaps there is something goes wrong with my code. I could not find out which part in my code is false. If you could find out the problem in the code, I would appreciate it very much. 
 
 For other componet, I would also modify the code in the later.
