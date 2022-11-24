@@ -2,6 +2,32 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
+'''
+This multi-relational graph convolutional network(MR-GCN) is referenced in the paper: Modeling relational data with graph convolutional networks.ESWC2018.
+network architecture:
+
+              |--------------------|
+              |                   _|___RGCNEncoderConfig
+              |                /   |
+              | RGCNEncoder(config)|
+              |--------------------|
+              | + RGCNLayer        |
+              |--------------------|
+              |forward():          |
+              | RGCNLayer.forward()|
+              |--------------------|
+                        ^
+                        |
+                        |
+                        |
+              |--------------------| 
+              | RoleRGCNEncoder    |
+              |--------------------|
+              |--------------------|
+                 
+Some matrix calculation in the RGCNLayer is written as the Einstein Summation convention: torch.ninsum('exper-', var1, var2)
+'''
 class RGCNLayer(nn.Module):
     def __init__(self, in_feat, out_feat, num_rels,
                  bias=None, activation=None, dropout=0.0):
@@ -93,7 +119,7 @@ class RoleRGCNEncoder(RGCNEncoder):
 
         self.node_embedding = nn.Embedding(self.config.num_node_types,
                                            self.config.dim_input)
-        #This next is the position embedding.
+        #This section is the position embedding. Removed this section if you model need not position information.
         # self.register_buffer('attr_order_embeds',
         #                      torch.FloatTensor(gen_order_embeds(20, self.config.dim_input)))
 
